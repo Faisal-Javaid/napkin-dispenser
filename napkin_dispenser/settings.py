@@ -24,9 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-&z%^&&dj%9nv6)4nygbe598y(olj+%6eut3%$y97iwc7u-zs0*'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['faisalj98.pythonanywhere.com','localhost', '127.0.0.1']
 
 
 # Application definition
@@ -135,18 +135,23 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 #STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+CSRF_TRUSTED_ORIGINS = ['https://faisalj98.pythonanywhere.com']
+
 # CORS
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOWED_ORIGINS = [
+    "https://faisalj98.pythonanywhere.com",
     "http://localhost:3000",
-    "http://127.0.0.1:3000",
 ]
+
+CORS_ALLOW_ALL_ORIGINS = False
 
 # REST Framework
 REST_FRAMEWORK = {

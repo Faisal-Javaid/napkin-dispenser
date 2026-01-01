@@ -1,0 +1,14 @@
+#!/bin/bash
+# This script runs after each deployment
+echo "Running post-deployment tasks..."
+
+# Run migrations
+python manage.py migrate
+
+# Collect static files
+python manage.py collectstatic --noinput
+
+# Create superuser if not exists (uncomment if needed)
+# python manage.py createsuperuser --noinput --username admin --email admin@example.com || true
+
+echo "Post-deployment tasks completed!"
