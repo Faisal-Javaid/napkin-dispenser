@@ -12,10 +12,11 @@ from .models import User, Wallet
 from .serializers import UserSerializer, UserCreateSerializer, UserLoginSerializer, WalletSerializer
 from .permissions import IsAdmin, IsOwnerOrAdmin
 from logs.models import Log
+from django.utils import timezone
 
 class AuthViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
-    
+
     @action(detail=False, methods=['post'])
     def register(self, request):
         serializer = UserCreateSerializer(data=request.data)
@@ -24,12 +25,12 @@ class AuthViewSet(viewsets.ViewSet):
             data = serializer.validated_data.copy()
             data['user_type'] = User.UserType.CUSTOMER
             data['account_verified'] = data.get('account_type') == User.AccountType.CORPORATE
-            
+
             user = serializer.create(data)
-            
+
             # Generate token
             token = self._generate_token(user)
-            
+
             # Log the registration
             Log.objects.create(
                 level='info',
@@ -39,14 +40,14 @@ class AuthViewSet(viewsets.ViewSet):
                 ip_address=self._get_client_ip(request),
                 metadata={'account_type': user.account_type}
             )
-            
+
             return Response({
                 'message': 'User registered successfully',
                 'token': token,
                 'user': UserSerializer(user).data,
                 'wallet': WalletSerializer(user.wallet).data if hasattr(user, 'wallet') else None
             }, status=status.HTTP_201_CREATED)
-        
+
         # Log failed registration
         Log.objects.create(
             level='warn',
@@ -56,9 +57,9 @@ class AuthViewSet(viewsets.ViewSet):
             request_body=request.data,
             error_message=str(serializer.errors)
         )
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=False, methods=['post'])
     def login(self, request):
         serializer = UserLoginSerializer(data=request.data)
@@ -66,7 +67,7 @@ class AuthViewSet(viewsets.ViewSet):
             phone_number = serializer.validated_data.get('phone_number')
             email = serializer.validated_data.get('email')
             password = serializer.validated_data.get('password')
-            
+
             # Find user
             try:
                 if phone_number:
@@ -82,7 +83,7 @@ class AuthViewSet(viewsets.ViewSet):
                     request_body={'phone_number': phone_number, 'email': email}
                 )
                 return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-            
+
             # Check password
             if not user.check_password(password):
                 Log.objects.create(
@@ -93,7 +94,7 @@ class AuthViewSet(viewsets.ViewSet):
                     ip_address=self._get_client_ip(request)
                 )
                 return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-            
+
             # Check if user is active
             if not user.is_active:
                 Log.objects.create(
@@ -104,10 +105,10 @@ class AuthViewSet(viewsets.ViewSet):
                     ip_address=self._get_client_ip(request)
                 )
                 return Response({'error': 'Account is deactivated'}, status=status.HTTP_401_UNAUTHORIZED)
-            
+
             # Generate token
             token = self._generate_token(user)
-            
+
             # Log successful login
             Log.objects.create(
                 level='info',
@@ -117,27 +118,27 @@ class AuthViewSet(viewsets.ViewSet):
                 ip_address=self._get_client_ip(request),
                 metadata={'user_type': user.user_type}
             )
-            
+
             return Response({
                 'message': 'Login successful',
                 'token': token,
                 'user': UserSerializer(user).data,
                 'wallet': WalletSerializer(user.wallet).data if hasattr(user, 'wallet') else None
             })
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def change_password(self, request):
         current_password = request.data.get('current_password')
         new_password = request.data.get('new_password')
-        
+
         if not current_password or not new_password:
-            return Response({'error': 'Both current and new password are required'}, 
+            return Response({'error': 'Both current and new password are required'},
                           status=status.HTTP_400_BAD_REQUEST)
-        
+
         user = request.user
-        
+
         if not user.check_password(current_password):
             Log.objects.create(
                 level='warn',
@@ -146,12 +147,12 @@ class AuthViewSet(viewsets.ViewSet):
                 user_id=user.id,
                 ip_address=self._get_client_ip(request)
             )
-            return Response({'error': 'Current password is incorrect'}, 
+            return Response({'error': 'Current password is incorrect'},
                           status=status.HTTP_401_UNAUTHORIZED)
-        
+
         user.set_password(new_password)
         user.save()
-        
+
         Log.objects.create(
             level='info',
             action='PASSWORD_CHANGED',
@@ -159,9 +160,9 @@ class AuthViewSet(viewsets.ViewSet):
             user_id=user.id,
             ip_address=self._get_client_ip(request)
         )
-        
+
         return Response({'message': 'Password updated successfully'})
-    
+
     def _generate_token(self, user):
         payload = {
             'user_id': str(user.id),
@@ -169,7 +170,7 @@ class AuthViewSet(viewsets.ViewSet):
             'iat': datetime.utcnow()
         }
         return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-    
+
     def _get_client_ip(self, request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
@@ -182,33 +183,33 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAdmin]
-    
+
     def get_permissions(self):
         if self.action in ['retrieve', 'update', 'partial_update']:
             return [IsOwnerOrAdmin()]
         return super().get_permissions()
-    
+
     def get_queryset(self):
         if self.request.user.is_admin:
             return User.objects.all()
         return User.objects.filter(id=self.request.user.id)
-    
+
     @action(detail=False, methods=['post'], permission_classes=[IsAdmin])
     def create_user(self, request):
         """Admin endpoint to create users of any type"""
         serializer = UserCreateSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            
+
             # Auto-verify non-customer users
             if user.user_type != User.UserType.CUSTOMER:
                 user.account_verified = True
                 user.save()
-            
+
             # Create wallet for customers
             if user.user_type == User.UserType.CUSTOMER:
                 Wallet.objects.create(user=user)
-            
+
             Log.objects.create(
                 level='info',
                 action='ADMIN_USER_CREATION',
@@ -217,29 +218,29 @@ class UserViewSet(viewsets.ModelViewSet):
                 admin_id=request.user.id,
                 ip_address=self._get_client_ip(request)
             )
-            
+
             return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
     def add_credits(self, request, pk=None):
         user = self.get_object()
         credits = request.data.get('credits', 0)
-        
+
         try:
             credits = int(credits)
             if credits <= 0:
-                return Response({'error': 'Credits must be positive'}, 
+                return Response({'error': 'Credits must be positive'},
                               status=status.HTTP_400_BAD_REQUEST)
         except (ValueError, TypeError):
-            return Response({'error': 'Invalid credits value'}, 
+            return Response({'error': 'Invalid credits value'},
                           status=status.HTTP_400_BAD_REQUEST)
-        
+
         wallet, created = Wallet.objects.get_or_create(user=user)
         wallet.balance += credits
         wallet.save()
-        
+
         Log.objects.create(
             level='info',
             action='CREDITS_ADDED',
@@ -249,12 +250,68 @@ class UserViewSet(viewsets.ModelViewSet):
             ip_address=self._get_client_ip(request),
             metadata={'credits_added': credits, 'new_balance': wallet.balance}
         )
-        
+
         return Response({
             'message': f'Added {credits} credits to user',
             'new_balance': wallet.balance
         })
-    
+
     def _get_client_ip(self, request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         return x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
+    def update_subscription(self, request, pk=None):
+        """Update user subscription (Admin only)"""
+        user = self.get_object()
+        serializer = SubscriptionUpdateSerializer(data=request.data)
+
+        if serializer.is_valid():
+            subscription_type = serializer.validated_data['subscription_type']
+            duration_days = serializer.validated_data.get('duration_days', 30)
+
+            # Update subscription
+            user.subscription_type = subscription_type
+            user.subscription_start_date = timezone.now()
+
+            if subscription_type == User.SubscriptionType.CORPORATE:
+                user.subscription_end_date = timezone.now() + timedelta(days=duration_days)
+                wallet, created = Wallet.objects.get_or_create(user=user)
+                wallet.balance += 7
+                wallet.save()
+            elif subscription_type == User.SubscriptionType.BASIC:
+                user.subscription_end_date = None  # Basic is ongoing
+                wallet, created = Wallet.objects.get_or_create(user=user)
+                wallet.balance += 1
+                wallet.save()
+            elif subscription_type == User.SubscriptionType.PREMIUM:
+                user.subscription_end_date = timezone.now() + timedelta(days=duration_days)
+            else:  # NONE
+                user.subscription_end_date = None
+
+            user.save()
+
+            return Response({
+                'message': f'Subscription updated to {subscription_type}',
+                'subscription_type': user.subscription_type,
+                'subscription_end_date': user.subscription_end_date,
+            })
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def my_subscription(self, request):
+        """Get current user's subscription details"""
+        user = request.user
+        data = {
+            'subscription_type': user.subscription_type,
+            'subscription_start_date': user.subscription_start_date,
+            'subscription_end_date': user.subscription_end_date,
+            'days_remaining': None
+        }
+
+        # Calculate days remaining for corporate/premium subscriptions
+        if user.subscription_end_date and user.has_active_subscription:
+            days_remaining = (user.subscription_end_date - timezone.now()).days
+            data['days_remaining'] = max(0, days_remaining)
+
+        return Response(data)

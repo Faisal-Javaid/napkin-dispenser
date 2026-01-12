@@ -8,7 +8,7 @@ class DispenserProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DispenserProduct
-        fields = ['id', 'row_number', 'product', 'product_id', 
+        fields = ['id', 'row_number', 'product', 'product_id',
                   'current_inventory', 'max_capacity', 'created_at']
         read_only_fields = ['id', 'created_at']
 
@@ -17,6 +17,6 @@ class DispenserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Dispenser
-        fields = ['id', 'ble_beacon_id', 'location_name', 'gps_coordinates',
+        fields = ['dispenser_id', 'ble_beacon_id', 'location_name', 'gps_coordinates',
                   'install_date', 'created_at', 'rows']
-        read_only_fields = ['id', 'install_date', 'created_at', 'rows']
+        read_only_fields = ['dispenser_id', 'install_date', 'created_at', 'rows']

@@ -2,7 +2,7 @@ from django.db import models
 import uuid
 
 class Dispenser(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dispenser_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ble_beacon_id = models.CharField(max_length=100, unique=True)
     location_name = models.CharField(max_length=200)
     gps_coordinates = models.JSONField()  # {'lat': 24.7136, 'lng': 46.6753}
@@ -21,7 +21,7 @@ class DispenserProduct(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     dispenser = models.ForeignKey(Dispenser, on_delete=models.CASCADE, related_name='rows')
     row_number = models.IntegerField()
-    product = models.ForeignKey('products.Product', on_delete=models.SET_NULL, 
+    product = models.ForeignKey('products.Product', on_delete=models.SET_NULL,
                                 null=True, blank=True, related_name='dispenser_products')
     current_inventory = models.IntegerField(default=0)
     max_capacity = models.IntegerField(default=0)

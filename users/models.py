@@ -8,7 +8,7 @@ class UserManager(BaseUserManager):
     def create_user(self, phone_number, password=None, **extra_fields):
         if not phone_number:
             raise ValueError('Phone number is required')
-        
+
         user = self.model(phone_number=phone_number, **extra_fields)
         if password:
             user.set_password(password)
@@ -20,7 +20,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('user_type', 'admin')
         extra_fields.setdefault('account_verified', True)
-        
+
         return self.create_user(phone_number, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -33,10 +33,19 @@ class User(AbstractBaseUser, PermissionsMixin):
         INDIVIDUAL = 'individual', 'Individual'
         CORPORATE = 'corporate', 'Corporate'
 
+    class SubscriptionType(models.TextChoices):
+        BASIC = 'basic', 'Basic (Free Napkins)'
+        PREMIUM = 'premium', 'Premium (Paid)'
+        CORPORATE = 'corporate', 'Corporate Plan'
+        NONE = 'none', 'No Subscription'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     phone_number = models.CharField(max_length=20, unique=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     user_type = models.CharField(max_length=20, choices=UserType.choices, default=UserType.CUSTOMER)
+    subscription_type = models.CharField(max_length=20, choices=SubscriptionType.choices, default=SubscriptionType.BASIC)
+    subscription_start_date = models.DateTimeField(null=True, blank=True)
+    subscription_end_date = models.DateTimeField(null=True, blank=True)
     account_type = models.CharField(max_length=20, choices=AccountType.choices, default=AccountType.INDIVIDUAL)
     account_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)

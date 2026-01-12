@@ -2,7 +2,7 @@ from django.db import models
 import uuid
 
 class Product(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product_name = models.CharField(max_length=200)
     credit_cost = models.IntegerField(default=1)
     is_active = models.BooleanField(default=True)
